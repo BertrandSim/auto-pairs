@@ -100,6 +100,83 @@ if !exists('g:AutoPairsSmartQuotes')
   let g:AutoPairsSmartQuotes = 1
 endif
 
+" If this option is set, then pressing backspace here: (((|)))
+" will delete all the opened pairs. Otherwise, it will delete
+" just one pair per keystroke.
+"
+" Default: 1
+if !exists('g:AutoPairsDelRepeatedPairs')
+  let g:AutoPairsDelRepeatedPairs = 1
+endif
+
+" If this option is set, then plugin remembers how many pairs were
+" inserted automatically, and will handle only this count of pairs.
+" Say, if you just typed "(", then pair ")" will be inserted, and when you type
+" ")", cursor will just jump over ")", as always.
+"
+" But then, if you move cursor on any other ")" char and press ")",
+" it will not jump over it. Instead, ")" char will be inserted.
+"
+" The same is for any other pair character.
+" This is how modern IDEs actually work.
+"
+" So, if you opened 3 parentheses, it will jump over 3 closing parentheses,
+" not more.
+"
+" If you quit insert mode, pair count is reset to 0.
+"
+" Default: 0
+if !exists('g:AutoPairsUseInsertedCount')
+  let g:AutoPairsUseInsertedCount = 0
+endif
+
+
+" Will auto generated {']' => '[', ..., '}' => '{'}in initialize.
+let g:AutoPairsClosedPairs = {}
+
+" This command should be added to any plugin mapping that leaves insert mode,
+" because when user leaves insert mode, b:autopairs_ins_cnt is reset.
+" This command undoes this unwanted reset.
+let s:InsCntUndoResetCmd = "\<C-R>=AutoPairsInsCntUndoReset()\<CR>"
+
+function! <SID>AutoPairsInsCntReset()
+  if g:AutoPairsUseInsertedCount
+    let b:autopairs_ins_cnt__before_reset = b:autopairs_ins_cnt
+    let b:autopairs_ins_cnt = 0
+  endif
+endfunction
+
+function! <SID>AutoPairsInsCntInc(cnt)
+  if g:AutoPairsUseInsertedCount
+    let b:autopairs_ins_cnt = b:autopairs_ins_cnt + a:cnt
+  endif
+endfunction
+
+function! <SID>AutoPairsInsCntDec()
+  if g:AutoPairsUseInsertedCount
+    let b:autopairs_ins_cnt = b:autopairs_ins_cnt - 1
+  endif
+endfunction
+
+function! <SID>AutoPairsInsCntAvail()
+  let ret = 1
+
+  if g:AutoPairsUseInsertedCount
+    let ret = (b:autopairs_ins_cnt > 0)
+  endif
+
+  return ret
+endfunction
+
+
+function! AutoPairsInsCntUndoReset()
+  if g:AutoPairsUseInsertedCount
+    let b:autopairs_ins_cnt = b:autopairs_ins_cnt__before_reset
+  endif
+  return ""
+endfunction
+
+
 " 7.4.849 support <C-G>U to avoid breaking '.'
 " Issue talk: https://github.com/jiangmiao/auto-pairs/issues/3
 " Vim note: https://github.com/vim/vim/releases/tag/v7.4.849
@@ -111,8 +188,6 @@ endif
 
 let s:Left = s:Go."\<LEFT>"
 let s:Right = s:Go."\<RIGHT>"
-
-
 
 
 " unicode len
@@ -254,6 +329,8 @@ func! AutoPairsInsert(key)
           end
         end
       endwhile
+      call <SID>AutoPairsInsCntInc(1)			" which one?
+      " call <SID>AutoPairsInsCntInc(len(openPair))  	" which one?
       return bs.del.openPair.close.s:left(close)
     end
   endfor
@@ -267,10 +344,15 @@ func! AutoPairsInsert(key)
       " the close pair is in the same line
       let m = matchstr(afterline, '^\v\s*\V'.close)
       if m != ''
+	if !<SID>AutoPairsInsCntAvail()
+	  return a:key
+	endif
         if before =~ '\V'.open.'\v\s*$' && m[0] =~ '\v\s'
           " remove the space we inserted if the text in pairs is blank
-          return "\<DEL>".s:right(m[1:])
+	  call <SID>AutoPairsInsCntDec()
+          return.s:right(m[1:])
         else
+	  call <SID>AutoPairsInsCntDec()
           return s:right(m)
         end
       end
@@ -281,6 +363,7 @@ func! AutoPairsInsert(key)
             normal! ddk$
           end
           call search(m, 'We')
+          call <SID>AutoPairsInsCntDec()
           return "\<Right>"
         else
           break
@@ -293,6 +376,7 @@ func! AutoPairsInsert(key)
   " Fly Mode, and the key is closed-pairs, search closed-pair and jump
   if g:AutoPairsFlyMode &&  a:key =~ '\v[\}\]\)]'
     if search(a:key, 'We')
+      call <SID>AutoPairsInsCntDec()
       return "\<Right>"
     endif
   endif
@@ -404,16 +488,16 @@ func! AutoPairsReturn()
       " If equalprg has been set, then avoid call =
       " https://github.com/jiangmiao/auto-pairs/issues/24
       if &equalprg != ''
-        return "\<ESC>".cmd."O"
+	return "\<ESC>O".cmd.s:InsCntUndoResetCmd
       endif
 
       " conflict with javascript and coffee
       " javascript   need   indent new line
       " coffeescript forbid indent new line
       if &filetype == 'coffeescript' || &filetype == 'coffee'
-        return "\<ESC>".cmd."k==o"
+	return "\<ESC>k==o".cmd.s:InsCntUndoResetCmd
       else
-        return "\<ESC>".cmd."=ko"
+	return "\<ESC>=ko".cmd.s:InsCntUndoResetCmd
       endif
     end
   endfor
@@ -473,6 +557,9 @@ func! AutoPairsInit()
   if !exists('b:autopairs_enabled')
     let b:autopairs_enabled = 1
   end
+
+  let b:autopairs_ins_cnt = 0
+  let b:autopairs_ins_cnt__before_reset = 0
 
   if !exists('b:AutoPairs')
     let b:AutoPairs = AutoPairsDefaultPairs()
@@ -670,4 +757,6 @@ inoremap <silent> <SID>AutoPairsReturn <C-R>=AutoPairsReturn()<CR>
 imap <script> <Plug>AutoPairsReturn <SID>AutoPairsReturn
 
 
-au BufEnter * :call AutoPairsTryInit()
+au BufEnter    * :call AutoPairsTryInit()
+au InsertLeave * :call <SID>AutoPairsInsCntReset()
+
