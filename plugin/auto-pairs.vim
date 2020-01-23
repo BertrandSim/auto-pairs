@@ -344,15 +344,15 @@ func! AutoPairsInsert(key)
       " the close pair is in the same line
       let m = matchstr(afterline, '^\v\s*\V'.close)
       if m != ''
-	if !<SID>AutoPairsInsCntAvail()
-	  return a:key
-	endif
+        if !<SID>AutoPairsInsCntAvail()
+          return a:key
+        endif
         if before =~ '\V'.open.'\v\s*$' && m[0] =~ '\v\s'
           " remove the space we inserted if the text in pairs is blank
-	  call <SID>AutoPairsInsCntDec()
+          call <SID>AutoPairsInsCntDec()
           return.s:right(m[1:])
         else
-	  call <SID>AutoPairsInsCntDec()
+          call <SID>AutoPairsInsCntDec()
           return s:right(m)
         end
       end
@@ -488,16 +488,16 @@ func! AutoPairsReturn()
       " If equalprg has been set, then avoid call =
       " https://github.com/jiangmiao/auto-pairs/issues/24
       if &equalprg != ''
-	return "\<ESC>O".cmd.s:InsCntUndoResetCmd
+        return "\<ESC>O".cmd.s:InsCntUndoResetCmd
       endif
 
       " conflict with javascript and coffee
       " javascript   need   indent new line
       " coffeescript forbid indent new line
       if &filetype == 'coffeescript' || &filetype == 'coffee'
-	return "\<ESC>k==o".cmd.s:InsCntUndoResetCmd
+        return "\<ESC>k==o".cmd.s:InsCntUndoResetCmd
       else
-	return "\<ESC>=ko".cmd.s:InsCntUndoResetCmd
+        return "\<ESC>=ko".cmd.s:InsCntUndoResetCmd
       endif
     end
   endfor
