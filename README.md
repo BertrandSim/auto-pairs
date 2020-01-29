@@ -169,11 +169,25 @@ Options
 
         Default: {'(':')', '[':']', '{':'}',"'":"'",'"':'"', '`':'`'}
 
+        Specifies which symbols should be automatically paired.
+
+        To append new pairs without overwriting defaults, add values in your `.vimrc`.:
+
+            let g:AutoPairs['<']='>'
+
+        This example will enable matching of `<` with `>`.
+
 *   b:AutoPairs
 
         Default: g:AutoPairs
 
         Buffer level pairs set.
+
+        You can set |b:AutoPairs| before |BufEnter|: >
+
+            au Filetype FILETYPE let b:AutoPairs = {"(": ")"}
+
+        This sets |AutoPairs| to only match for parenthesis for 'FILETYPE'.
 
 *   g:AutoPairsShortcutToggle
 
@@ -299,9 +313,6 @@ Options
 
         NOTE: single quotes must be escaped (with a quote), use <BAR> for |
 
-
-
-
 *    g:AutoPairsSkipQuotes
 
         Default: 0
@@ -325,16 +336,6 @@ the end of the line, add these settings to your vimrc.
     let g:AutoPairsBalanceImmediately=1
     let g:AutoPairsNeverJumpLines=1
 
-
-Buffer Level Pairs Setting
---------------------------
-
-Set b:AutoPairs before BufEnter
-
-eg:
-
-    " When the filetype is FILETYPE then make AutoPairs only match for parenthesis
-    au Filetype FILETYPE let b:AutoPairs = {"(": ")"}
 
 TroubleShooting
 ---------------
